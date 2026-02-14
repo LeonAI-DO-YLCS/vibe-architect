@@ -17,7 +17,7 @@
 
 <p align="center">
   <a href="https://specs-gen.vercel.app"><strong>🌐 Live Demo</strong></a> &nbsp;·&nbsp;
-  <a href="https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fmohdhd%2Fvibe-architect"><img src="https://vercel.com/button" alt="Deploy with Vercel" height="24" /></a>
+  <a href="https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FLeonAI-DO-YLCS%2Fvibe-architect"><img src="https://vercel.com/button" alt="Deploy with Vercel" height="24" /></a>
 </p>
 
 ---
@@ -61,7 +61,7 @@ Each phase follows **Propose → Refine → Lock**. The AI always asks for your 
 
 ```bash
 # Clone the repository
-git clone https://github.com/mohdhd/vibe-architect.git
+git clone https://github.com/LeonAI-DO-YLCS/vibe-architect.git
 cd vibe-architect
 
 # Install dependencies

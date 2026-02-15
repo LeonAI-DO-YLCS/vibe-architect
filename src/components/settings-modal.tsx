@@ -392,15 +392,23 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 
                 {/* ── Provider Form Modal ─────────────────────────────────── */}
                 {showProviderForm && (
-                    <div className="fixed inset-0 z-60 flex items-center justify-center p-4">
-                        <div className="absolute inset-0 bg-black/40" onClick={() => setShowProviderForm(false)} />
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 overflow-y-auto">
+                        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowProviderForm(false)} />
                         <div
-                            className="relative w-full max-w-lg max-h-[85vh] overflow-y-auto bg-[var(--bg-surface)] rounded-[var(--radius-md)] border border-[var(--border-subtle)] p-5"
+                            className="relative w-full max-w-lg bg-[var(--bg-surface)] rounded-[var(--radius-md)] border border-[var(--border-subtle)] p-5 my-8"
                             onClick={(e) => e.stopPropagation()}
                         >
-                            <h3 className="text-md font-semibold mb-4">
-                                {editingProvider ? "Edit Provider" : "Add Custom Provider"}
-                            </h3>
+                            <div className="flex items-center justify-between mb-4">
+                                <h3 className="text-md font-semibold">
+                                    {editingProvider ? "Edit Provider" : "Add Custom Provider"}
+                                </h3>
+                                <button
+                                    onClick={() => setShowProviderForm(false)}
+                                    className="flex h-6 w-6 items-center justify-center rounded-[var(--radius-sm)] text-[var(--accent-muted)] hover:text-[var(--accent-primary)]"
+                                >
+                                    ✕
+                                </button>
+                            </div>
 
                             {/* Template Selection */}
                             <div className="mb-4">

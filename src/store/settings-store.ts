@@ -13,6 +13,9 @@ interface SettingsState {
 
     // Custom providers
     customProviders: CustomProvider[];
+    
+    // Active custom provider ID (null if using built-in)
+    activeCustomProviderId: string | null;
 
     // Model selection
     activeLLMModel: LLMModel;
@@ -32,6 +35,7 @@ interface SettingsState {
     removeCustomProvider: (id: string) => void;
     getCustomProvider: (id: string) => CustomProvider | undefined;
     getCustomProviderKey: (id: string) => string;
+    setActiveCustomProvider: (id: string | null) => void;
 
     // Helpers
     getKeyForProvider: (provider: "openai" | "gemini" | "anthropic" | "mistral") => string;
@@ -66,6 +70,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     anthropicKey: "",
     mistralKey: "",
     customProviders: [],
+    activeCustomProviderId: null,
     activeLLMModel: "gpt-5.2-high",
     isConfigured: false,
 
@@ -97,6 +102,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
             anthropicKey: "",
             mistralKey: "",
             customProviders: [],
+            activeCustomProviderId: null,
+            activeLLMModel: "gpt-5.2-high",
             isConfigured: false,
         });
         localStorage.removeItem(STORAGE_KEY);
@@ -113,6 +120,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
                     anthropicKey: p.anthropicKey || "",
                     mistralKey: p.mistralKey || "",
                     customProviders: (p.customProviders as CustomProvider[]) || [],
+                    activeCustomProviderId: p.activeCustomProviderId || null,
                     activeLLMModel: p.activeLLMModel || "gpt-5.2-high",
                 };
                 set({
@@ -205,6 +213,24 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         const provider = get().customProviders.find(p => p.id === id);
         return provider?.auth.keyValue || "";
     },
+
+    setActiveCustomProvider: (id) => {
+        set({ activeCustomProviderId: id });
+        
+        // If setting a custom provider as active, also set the first model as active
+        if (id) {
+            const provider = get().customProviders.find(p => p.id === id);
+            if (provider && provider.models.length > 0) {
+                const modelId = `${provider.id}:${provider.models[0].id}` as LLMModel;
+                set({ activeLLMModel: modelId });
+            }
+        } else {
+            // If switching to built-in, reset to default model
+            set({ activeLLMModel: "gpt-5.2-high" });
+        }
+        
+        persistSettings(get());
+    },
 }));
 
 function persistSettings(state: SettingsState) {
@@ -217,6 +243,7 @@ function persistSettings(state: SettingsState) {
                 anthropicKey: state.anthropicKey,
                 mistralKey: state.mistralKey,
                 customProviders: state.customProviders,
+                activeCustomProviderId: state.activeCustomProviderId,
                 activeLLMModel: state.activeLLMModel,
             })
         );

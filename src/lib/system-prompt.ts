@@ -1,3 +1,5 @@
+import { CodebaseContext } from "@/types/codebase-context";
+
 export const SYSTEM_PROMPT = `<role>
 You are the "Proactive Vibe Architect," an elite software architect and UI/UX visionary. You are the lead driver of this project. Your job is to take the user's raw app idea and proactively generate highly specific, opinionated proposals for the design system, product scope, and tech stack. 
 
@@ -117,3 +119,51 @@ Output ONLY the raw markdown content. Do NOT wrap it in \`\`\`markdown code fenc
 
 Output ONLY the raw markdown content. Do NOT wrap it in \`\`\`markdown code fences. No explanatory text before or after.`,
 };
+
+/**
+ * Format codebase contexts for injection into system prompt
+ * Creates XML blocks for each active context
+ */
+export function formatContextsForPrompt(contexts: CodebaseContext[]): string {
+  const activeContexts = contexts.filter((c) => c.metadata.isActive);
+  
+  if (activeContexts.length === 0) {
+    return "";
+  }
+  
+  const contextBlocks = activeContexts.map((context) => {
+    const language = context.metadata.language || "text";
+    const path = context.metadata.path || context.name;
+    
+    return `<codebase_context type="${context.type}" name="${context.name}" path="${path}">
+\`\`\`${language}
+${context.content}
+\`\`\`
+</codebase_context>`;
+  });
+  
+  return `
+<attached_codebase>
+The following codebase files/snippets have been attached by the user for context. Use this existing code as reference when generating specifications and implementation plans. Maintain consistency with existing patterns, styles, and conventions where appropriate.
+
+${contextBlocks.join("\n\n")}
+</attached_codebase>
+`;
+}
+
+/**
+ * Build the complete system prompt with optional context injection
+ */
+export function buildSystemPrompt(contexts: CodebaseContext[] = []): string {
+  const contextBlock = formatContextsForPrompt(contexts);
+  
+  if (!contextBlock) {
+    return SYSTEM_PROMPT;
+  }
+  
+  // Inject context block after the role section
+  return SYSTEM_PROMPT.replace(
+    "</role>",
+    `</role>${contextBlock}`
+  );
+}

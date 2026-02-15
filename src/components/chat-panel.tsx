@@ -7,8 +7,9 @@ import { useSettingsStore } from "@/store/settings-store";
 import { streamChat } from "@/lib/llm-client";
 import { PHASE_SPEC_PROMPTS } from "@/lib/system-prompt";
 import { extractUiPreviews, getLatestUiPreview, hasCompleteUiPreview } from "@/lib/ui-parser";
-import { getModelConfig, ConversationPhase } from "@/types";
+import { getModelConfig, ConversationPhase, isBuiltInModel } from "@/types";
 import MicButton from "./mic-button";
+import ContextPanel from "./context-panel";
 
 const PHASE_ORDER: ConversationPhase[] = ["vision", "design", "stack", "export"];
 const PHASE_LABELS: Record<ConversationPhase, string> = {
@@ -69,8 +70,18 @@ export default function ChatPanel() {
 
             let fullResponse = "";
 
-            const config = getModelConfig(activeLLMModel);
-            const apiKey = getKeyForProvider(config.provider);
+            // Get API key based on model type
+            let apiKey = "";
+            if (isBuiltInModel(activeLLMModel)) {
+                const config = getModelConfig(activeLLMModel);
+                if (config) {
+                    apiKey = getKeyForProvider(config.provider as "openai" | "gemini" | "anthropic" | "mistral");
+                }
+            }
+            // For custom models, apiKey is not needed (stored in provider config)
+
+            // Get codebase contexts from conversation
+            const contexts = conversation?.codebaseContexts || [];
 
             streamChat({
                 messages: [
@@ -80,6 +91,7 @@ export default function ChatPanel() {
                 apiKey,
                 model: activeLLMModel,
                 signal: abortController.signal,
+                contexts,
                 onChunk: (chunk) => {
                     fullResponse += chunk;
                     appendToLastAssistant(activeConversationId, chunk);
@@ -116,6 +128,7 @@ export default function ChatPanel() {
             appendToLastAssistant,
             setSandboxCode,
             setStreaming,
+            conversation?.codebaseContexts,
         ]
     );
 
@@ -162,8 +175,18 @@ export default function ChatPanel() {
         setStreaming(true);
 
         // Stream the spec generation and save to specDocs on completion
-        const config = getModelConfig(activeLLMModel);
-        const apiKey = getKeyForProvider(config.provider);
+        // Get API key based on model type
+        let apiKey = "";
+        if (isBuiltInModel(activeLLMModel)) {
+            const config = getModelConfig(activeLLMModel);
+            if (config) {
+                apiKey = getKeyForProvider(config.provider as "openai" | "gemini" | "anthropic" | "mistral");
+            }
+        }
+        // For custom models, apiKey is not needed (stored in provider config)
+
+        // Get codebase contexts from conversation
+        const contexts = conversation?.codebaseContexts || [];
 
         const abortController = new AbortController();
         abortRef.current = abortController;
@@ -182,6 +205,7 @@ export default function ChatPanel() {
             apiKey,
             model: activeLLMModel,
             signal: abortController.signal,
+            contexts,
             onChunk: (chunk) => {
                 fullResponse += chunk;
                 appendToLastAssistant(activeConversationId, chunk);
@@ -222,6 +246,7 @@ export default function ChatPanel() {
         setStreaming,
         setPhase,
         setSpecDoc,
+        conversation?.codebaseContexts,
     ]);
 
     const handleStop = () => {
@@ -266,6 +291,47 @@ export default function ChatPanel() {
 
     return (
         <div className="flex h-full flex-col">
+            {/* Context Panel */}
+            {conversation?.codebaseContexts && conversation.codebaseContexts.length > 0 ? (
+                <ContextPanel
+                    conversationId={activeConversationId}
+                    contexts={conversation.codebaseContexts}
+                />
+            ) : (
+                <div className="border-b border-[var(--border-subtle)] bg-[var(--bg-elevated)]/30 px-4 py-1.5">
+                    <button
+                        onClick={() => {
+                            // Add an empty context to show the panel
+                            // The user can then add files/snippets
+                            const fileInput = document.createElement('input');
+                            fileInput.type = 'file';
+                            fileInput.multiple = true;
+                            fileInput.accept = '.ts,.tsx,.js,.jsx,.py,.json,.yaml,.yml,.md,.txt,.css,.html,.sql,.sh';
+                            fileInput.onchange = async (e) => {
+                                const files = (e.target as HTMLInputElement).files;
+                                if (files) {
+                                    const { addContext } = useProjectStore.getState();
+                                    const { createContextFromFile } = await import('@/types/codebase-context');
+                                    for (const file of Array.from(files)) {
+                                        try {
+                                            const content = await file.text();
+                                            const context = createContextFromFile(file.name, content);
+                                            addContext(activeConversationId, context);
+                                        } catch (err) {
+                                            console.error('Failed to read file:', err);
+                                        }
+                                    }
+                                }
+                            };
+                            fileInput.click();
+                        }}
+                        className="text-xs text-[var(--accent-dim)] hover:text-[var(--accent-primary)] transition-colors"
+                    >
+                        📎 Add codebase context
+                    </button>
+                </div>
+            )}
+
             {/* Messages */}
             <div className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-4">
                 {messages.length === 0 && (

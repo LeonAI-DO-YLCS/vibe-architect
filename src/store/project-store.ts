@@ -6,6 +6,7 @@ import {
     Conversation,
     Message,
     ConversationPhase,
+    CodebaseContext,
 } from "@/types";
 
 const DB_PROJECTS_KEY = "vibe-architect-projects";
@@ -68,6 +69,12 @@ interface ProjectState {
     getActiveConversation: () => Conversation | undefined;
     getProjectConversations: (projectId: string) => Conversation[];
     persistAll: () => Promise<void>;
+
+    // Context management
+    addContext: (conversationId: string, context: CodebaseContext) => Promise<void>;
+    removeContext: (conversationId: string, contextId: string) => Promise<void>;
+    updateContext: (conversationId: string, contextId: string, updates: Partial<CodebaseContext>) => Promise<void>;
+    clearContexts: (conversationId: string) => Promise<void>;
 }
 
 // Debounced persist for streaming (avoids hammering IndexedDB)
@@ -186,6 +193,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
             messages: [],
             sandboxCode: null,
             specDocs: {},
+            codebaseContexts: [],
             createdAt: Date.now(),
             updatedAt: Date.now(),
         };
@@ -330,6 +338,67 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
             idbSet(DB_CONVERSATIONS_KEY, conversations),
         ]);
         await persistActive(get());
+    },
+
+    // Context management
+    addContext: async (conversationId, context) => {
+        const conversations = get().conversations.map((c) =>
+            c.id === conversationId
+                ? {
+                    ...c,
+                    codebaseContexts: [...c.codebaseContexts, context],
+                    updatedAt: Date.now(),
+                }
+                : c
+        );
+        set({ conversations });
+        await idbSet(DB_CONVERSATIONS_KEY, conversations);
+    },
+
+    removeContext: async (conversationId, contextId) => {
+        const conversations = get().conversations.map((c) =>
+            c.id === conversationId
+                ? {
+                    ...c,
+                    codebaseContexts: c.codebaseContexts.filter(
+                        (ctx) => ctx.id !== contextId
+                    ),
+                    updatedAt: Date.now(),
+                }
+                : c
+        );
+        set({ conversations });
+        await idbSet(DB_CONVERSATIONS_KEY, conversations);
+    },
+
+    updateContext: async (conversationId, contextId, updates) => {
+        const conversations = get().conversations.map((c) =>
+            c.id === conversationId
+                ? {
+                    ...c,
+                    codebaseContexts: c.codebaseContexts.map((ctx) =>
+                        ctx.id === contextId ? { ...ctx, ...updates } : ctx
+                    ),
+                    updatedAt: Date.now(),
+                }
+                : c
+        );
+        set({ conversations });
+        await idbSet(DB_CONVERSATIONS_KEY, conversations);
+    },
+
+    clearContexts: async (conversationId) => {
+        const conversations = get().conversations.map((c) =>
+            c.id === conversationId
+                ? {
+                    ...c,
+                    codebaseContexts: [],
+                    updatedAt: Date.now(),
+                }
+                : c
+        );
+        set({ conversations });
+        await idbSet(DB_CONVERSATIONS_KEY, conversations);
     },
 }));
 

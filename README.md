@@ -33,6 +33,8 @@ Vibe Architect is an open-source tool that helps you turn a raw app idea into a 
 - **Guided brainstorming** — The AI proposes concrete options (not open-ended questions) through a Propose → Refine → Lock workflow
 - **Live design previews** — See your design system rendered in real-time as the AI generates React component previews
 - **Multi-model support** — Bring your own API key for OpenAI (GPT-5.2), Google (Gemini 3), Anthropic (Claude Opus/Sonnet), or Mistral (Medium/Small)
+- **Custom providers** — Add your own LLM providers (Ollama, vLLM, Together, Groq, OpenRouter, DeepSeek, etc.) with full configuration support
+- **Codebase context** — Attach existing code files/snippets to provide context for the AI when generating specs
 - **Voice input** — Speak your ideas using the built-in mic button (Whisper-powered transcription)
 - **Spec editor** — Edit generated specs directly in the built-in markdown editor
 - **Export** — Download your complete spec as markdown files, ready for your coding workflow
@@ -86,6 +88,30 @@ Click the **⚙️ Settings** icon in the app and add your API key(s):
 
 Keys are stored locally in your browser — they never leave your machine.
 
+### Custom Providers
+
+You can add custom LLM providers in Settings → Custom Providers tab. This supports:
+
+- **OpenAI-compatible APIs** — Ollama, vLLM, Together, Groq, OpenRouter, DeepSeek, and most local/cloud providers
+- **Anthropic-compatible APIs** — Claude-compatible endpoints and self-hosted proxies
+- **Fully custom APIs** — Configure request/response formats manually
+
+For each provider, you can:
+- Set the base URL and API path
+- Configure authentication (Bearer token, X-API-Key, or custom)
+- Add multiple models with their API model IDs
+- Set max tokens and context window sizes
+
+### Codebase Context
+
+Attach existing code files to provide context for the AI:
+
+- Click **📎 Add codebase context** above the chat input
+- Upload files or paste code snippets
+- The AI will use this context when generating specs
+- Supports TypeScript, JavaScript, Python, JSON, YAML, Markdown, CSS, HTML, SQL, and more
+- Size limits: 100KB per file, 500KB total, 20 files max
+
 ## Supported Models
 
 | Model | Provider | Max Output Tokens |
@@ -120,19 +146,22 @@ src/
 ├── components/        # React components
 │   ├── chat-panel.tsx       # Chat interface
 │   ├── sandbox-panel.tsx    # Design preview + spec editor
-│   ├── settings-modal.tsx   # API key configuration
+│   ├── settings-modal.tsx   # API key + custom provider configuration
+│   ├── context-panel.tsx    # Codebase context attachment
 │   ├── export-modal.tsx     # Spec export dialog
 │   ├── mic-button.tsx       # Voice input (Whisper)
 │   ├── usage-guide.tsx      # First-time onboarding
 │   └── ...
 ├── lib/               # Core logic
-│   ├── llm-client.ts        # Multi-provider LLM streaming
-│   └── system-prompt.ts     # AI persona & workflow prompts
+│   ├── llm-client.ts        # Multi-provider LLM streaming (built-in + custom)
+│   └── system-prompt.ts     # AI persona & context injection
 ├── store/             # Zustand stores
-│   ├── project-store.ts     # Projects, conversations, specs
-│   └── settings-store.ts    # API keys, model selection
+│   ├── project-store.ts     # Projects, conversations, specs, contexts
+│   └── settings-store.ts    # API keys, model selection, custom providers
 └── types/             # TypeScript types & model configs
-    └── index.ts
+    ├── index.ts             # Core types
+    ├── custom-provider.ts   # Custom provider types
+    └── codebase-context.ts  # Context attachment types
 ```
 
 ## Contributing

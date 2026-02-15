@@ -5,7 +5,7 @@ import Markdown from "@/components/markdown";
 import { useProjectStore } from "@/store/project-store";
 import { useSettingsStore } from "@/store/settings-store";
 import { streamChat } from "@/lib/llm-client";
-import { getModelConfig, ConversationPhase } from "@/types";
+import { getModelConfig, ConversationPhase, isBuiltInModel } from "@/types";
 
 type TabMode = "preview" | "markdown" | "editor";
 
@@ -100,8 +100,17 @@ STRICT RULES:
 Output ONLY the raw JavaScript/JSX code.`;
 
     setIsGenerating(true);
-    const config = getModelConfig(activeLLMModel);
-    const apiKey = getKeyForProvider(config.provider);
+    
+    // Get API key based on model type
+    let apiKey = "";
+    if (isBuiltInModel(activeLLMModel)) {
+      const config = getModelConfig(activeLLMModel);
+      if (config) {
+        apiKey = getKeyForProvider(config.provider as "openai" | "gemini" | "anthropic" | "mistral");
+      }
+    }
+    // For custom models, apiKey is not needed (stored in provider config)
+    
     const abortController = new AbortController();
     abortRef.current = abortController;
     let fullResponse = "";

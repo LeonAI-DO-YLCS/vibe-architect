@@ -1,14 +1,17 @@
 import { create } from "zustand";
-import { LLMModel } from "@/types";
+import { LLMModel, CustomProvider, isBuiltInProvider, isBuiltInModel, getModelConfig } from "@/types";
 
 type KeyProvider = "openai" | "gemini" | "anthropic" | "mistral";
 
 interface SettingsState {
-    // API Keys
+    // API Keys (built-in providers)
     openaiKey: string;
     geminiKey: string;
     anthropicKey: string;
     mistralKey: string;
+
+    // Custom providers
+    customProviders: CustomProvider[];
 
     // Model selection
     activeLLMModel: LLMModel;
@@ -22,6 +25,13 @@ interface SettingsState {
     clearKeys: () => void;
     loadFromStorage: () => void;
 
+    // Custom provider actions
+    addCustomProvider: (provider: CustomProvider) => void;
+    updateCustomProvider: (id: string, updates: Partial<CustomProvider>) => void;
+    removeCustomProvider: (id: string) => void;
+    getCustomProvider: (id: string) => CustomProvider | undefined;
+    getCustomProviderKey: (id: string) => string;
+
     // Helpers
     getKeyForProvider: (provider: "openai" | "gemini" | "anthropic" | "mistral") => string;
     hasKeyForModel: (model: LLMModel) => boolean;
@@ -34,13 +44,21 @@ function computeIsConfigured(state: {
     geminiKey: string;
     anthropicKey: string;
     mistralKey: string;
+    customProviders: CustomProvider[];
 }): boolean {
-    return (
+    // Check built-in providers
+    const hasBuiltInKey =
         state.openaiKey.length > 0 ||
         state.geminiKey.length > 0 ||
         state.anthropicKey.length > 0 ||
-        state.mistralKey.length > 0
+        state.mistralKey.length > 0;
+    
+    // Check custom providers (at least one configured)
+    const hasConfiguredCustomProvider = state.customProviders.some(
+        (p) => p.auth.type === "none" || (p.auth.keyValue && p.auth.keyValue.length > 0)
     );
+    
+    return hasBuiltInKey || hasConfiguredCustomProvider;
 }
 
 export const useSettingsStore = create<SettingsState>((set, get) => ({
@@ -48,6 +66,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     geminiKey: "",
     anthropicKey: "",
     mistralKey: "",
+    customProviders: [],
     activeLLMModel: "gpt-5.2-high",
     isConfigured: false,
 
@@ -59,24 +78,17 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
             mistral: "mistralKey",
         };
         const update = { [keyMap[provider]]: value };
-        const state = { ...get(), ...update };
+        const newState = { ...get(), ...update } as SettingsState;
         set({
             ...update,
-            isConfigured: computeIsConfigured(
-                state as typeof state & {
-                    openaiKey: string;
-                    geminiKey: string;
-                    anthropicKey: string;
-                    mistralKey: string;
-                }
-            ),
+            isConfigured: computeIsConfigured(newState),
         });
-        persistSettings({ ...get(), ...update });
+        persistSettings(get());
     },
 
     setLLMModel: (model) => {
         set({ activeLLMModel: model });
-        persistSettings({ ...get(), activeLLMModel: model });
+        persistSettings(get());
     },
 
     clearKeys: () => {
@@ -85,6 +97,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
             geminiKey: "",
             anthropicKey: "",
             mistralKey: "",
+            customProviders: [],
             isConfigured: false,
         });
         localStorage.removeItem(STORAGE_KEY);
@@ -100,6 +113,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
                     geminiKey: p.geminiKey || "",
                     anthropicKey: p.anthropicKey || "",
                     mistralKey: p.mistralKey || "",
+                    customProviders: (p.customProviders as CustomProvider[]) || [],
                     activeLLMModel: p.activeLLMModel || "gpt-5.2-high",
                 };
                 set({
@@ -125,15 +139,69 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
 
     hasKeyForModel: (model) => {
         const s = get();
-        if (model.startsWith("gpt-")) return s.openaiKey.length > 0;
-        if (model.startsWith("gemini")) return s.geminiKey.length > 0;
-        if (model.startsWith("claude")) return s.anthropicKey.length > 0;
-        if (model.startsWith("mistral")) return s.mistralKey.length > 0;
+        
+        // Check if it's a built-in model
+        if (isBuiltInModel(model)) {
+            const config = getModelConfig(model);
+            if (config) {
+                const key = s.getKeyForProvider(config.provider as KeyProvider);
+                return key.length > 0;
+            }
+        }
+        
+        // For custom models, find the provider and check if configured
+        for (const provider of s.customProviders) {
+            const modelConfig = provider.models.find(m => m.id === model);
+            if (modelConfig) {
+                // Check if provider has API key or doesn't need one
+                return provider.auth.type === "none" || 
+                       (provider.auth.keyValue !== undefined && provider.auth.keyValue.length > 0);
+            }
+        }
+        
         return false;
+    },
+
+    // Custom provider actions
+    addCustomProvider: (provider) => {
+        const newProviders = [...get().customProviders, provider];
+        const newState = { ...get(), customProviders: newProviders } as SettingsState;
+        set({
+            customProviders: newProviders,
+            isConfigured: computeIsConfigured(newState),
+        });
+        persistSettings(get());
+    },
+
+    updateCustomProvider: (id, updates) => {
+        const newProviders = get().customProviders.map(p =>
+            p.id === id ? { ...p, ...updates } : p
+        );
+        set({ customProviders: newProviders });
+        persistSettings(get());
+    },
+
+    removeCustomProvider: (id) => {
+        const newProviders = get().customProviders.filter(p => p.id !== id);
+        const newState = { ...get(), customProviders: newProviders } as SettingsState;
+        set({
+            customProviders: newProviders,
+            isConfigured: computeIsConfigured(newState),
+        });
+        persistSettings(get());
+    },
+
+    getCustomProvider: (id) => {
+        return get().customProviders.find(p => p.id === id);
+    },
+
+    getCustomProviderKey: (id) => {
+        const provider = get().customProviders.find(p => p.id === id);
+        return provider?.auth.keyValue || "";
     },
 }));
 
-function persistSettings(state: Record<string, unknown>) {
+function persistSettings(state: SettingsState) {
     try {
         localStorage.setItem(
             STORAGE_KEY,
@@ -142,6 +210,7 @@ function persistSettings(state: Record<string, unknown>) {
                 geminiKey: state.geminiKey,
                 anthropicKey: state.anthropicKey,
                 mistralKey: state.mistralKey,
+                customProviders: state.customProviders,
                 activeLLMModel: state.activeLLMModel,
             })
         );

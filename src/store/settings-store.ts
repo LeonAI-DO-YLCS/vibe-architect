@@ -1,5 +1,6 @@
 import { create } from "zustand";
-import { LLMModel, CustomProvider, isBuiltInProvider, isBuiltInModel, getModelConfig } from "@/types";
+import { LLMModel, CustomProvider, isBuiltInModel, getModelConfig } from "@/types";
+import { isProviderConfigured } from "@/types/custom-provider";
 
 type KeyProvider = "openai" | "gemini" | "anthropic" | "mistral";
 
@@ -53,10 +54,8 @@ function computeIsConfigured(state: {
         state.anthropicKey.length > 0 ||
         state.mistralKey.length > 0;
     
-    // Check custom providers (at least one configured)
-    const hasConfiguredCustomProvider = state.customProviders.some(
-        (p) => p.auth.type === "none" || (p.auth.keyValue && p.auth.keyValue.length > 0)
-    );
+    // Check custom providers using the proper helper (checks URL, models, and auth)
+    const hasConfiguredCustomProvider = state.customProviders.some(isProviderConfigured);
     
     return hasBuiltInKey || hasConfiguredCustomProvider;
 }
@@ -147,15 +146,22 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
                 const key = s.getKeyForProvider(config.provider as KeyProvider);
                 return key.length > 0;
             }
+            return false;
         }
         
-        // For custom models, find the provider and check if configured
-        for (const provider of s.customProviders) {
-            const modelConfig = provider.models.find(m => m.id === model);
-            if (modelConfig) {
-                // Check if provider has API key or doesn't need one
-                return provider.auth.type === "none" || 
-                       (provider.auth.keyValue !== undefined && provider.auth.keyValue.length > 0);
+        // For custom models, parse the ID format: {providerId}:{modelId}
+        if (typeof model === 'string' && model.includes(':')) {
+            const colonIndex = model.indexOf(':');
+            const providerId = model.substring(0, colonIndex);
+            const modelId = model.substring(colonIndex + 1);
+            
+            const provider = s.customProviders.find(p => p.id === providerId);
+            if (provider) {
+                const modelConfig = provider.models.find(m => m.id === modelId);
+                if (modelConfig) {
+                    // Check if provider is properly configured
+                    return isProviderConfigured(provider);
+                }
             }
         }
         

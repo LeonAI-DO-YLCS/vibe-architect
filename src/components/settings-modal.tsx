@@ -483,8 +483,51 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                                     />
                                 </div>
 
+                                {/* Authentication Type */}
+                                <div>
+                                    <label className="block text-xs font-medium text-[var(--accent-muted)] mb-1">
+                                        Authentication
+                                    </label>
+                                    <select
+                                        value={providerForm.auth?.type || "bearer"}
+                                        onChange={(e) => {
+                                            const authType = e.target.value as "none" | "bearer" | "x-api-key" | "query-param";
+                                            const currentKeyValue = providerForm.auth?.keyValue;
+                                            let newAuth: typeof providerForm.auth;
+                                            
+                                            if (authType === "none") {
+                                                newAuth = { type: "none", keyName: "", keyPrefix: "" };
+                                            } else if (authType === "bearer") {
+                                                newAuth = { type: "bearer", keyName: "Authorization", keyPrefix: "Bearer ", keyValue: currentKeyValue };
+                                            } else if (authType === "x-api-key") {
+                                                newAuth = { type: "x-api-key", keyName: "x-api-key", keyPrefix: "", keyValue: currentKeyValue };
+                                            } else {
+                                                newAuth = { type: "query-param", keyName: "api_key", keyPrefix: "", keyValue: currentKeyValue };
+                                            }
+                                            
+                                            setProviderForm((prev) => ({ ...prev, auth: newAuth }));
+                                        }}
+                                        className="w-full rounded-[var(--radius-sm)] border border-[var(--border-subtle)] bg-[var(--bg-base)] px-3 py-2 text-sm text-[var(--accent-primary)] focus:border-[var(--border-focus)] focus:outline-none"
+                                    >
+                                        <option value="none">No Auth (e.g., Ollama)</option>
+                                        <option value="bearer">Bearer Token (Standard)</option>
+                                        <option value="x-api-key">X-API-Key Header</option>
+                                        <option value="query-param">Query Parameter</option>
+                                    </select>
+                                    <p className="mt-1 text-xs text-[var(--accent-dim)]">
+                                        {providerForm.auth?.type === "none" 
+                                            ? "No API key required for this provider"
+                                            : providerForm.auth?.type === "bearer"
+                                            ? "Sends: Authorization: Bearer YOUR_KEY"
+                                            : providerForm.auth?.type === "x-api-key"
+                                            ? "Sends: x-api-key: YOUR_KEY"
+                                            : "Appends: ?api_key=YOUR_KEY to URL"
+                                        }
+                                    </p>
+                                </div>
+
                                 {/* API Key (if needed) */}
-                                {(providerForm.auth?.type !== "none" || providerNeedsApiKey(providerForm as CustomProvider)) && (
+                                {providerForm.auth?.type !== "none" && (
                                     <div>
                                         <label className="block text-xs font-medium text-[var(--accent-muted)] mb-1">
                                             API Key
